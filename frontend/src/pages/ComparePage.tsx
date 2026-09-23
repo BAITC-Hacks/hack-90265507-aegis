@@ -9,7 +9,7 @@ type Fact={value?:string|number;source:string;conflict?:boolean;propertyValue?:s
 type Verified=Product & {facts?:Record<string,Fact>;verifiedAt?:string};
 const labels:Record<string,string>={TORGOVAYA_MARKA:"Бренд",NOMINALNYY_TOK:"Номинальный ток",KOLICHESTVO_POLYUSOV:"Количество полюсов",NOMINALNOE_NAPRYAZHENIE:"Напряжение",NOMINALNAYA_OTKLYUCHAYUSHCHAYA_SPOSOBNOST:"Отключающая способность",TIP_USTANOVKI:"Монтаж",KRATNOST_MIN:"Минимальная кратность"};
 export default function ComparePage(){
-  const {compare,toggleCompare,requestAddToCart}=useShop();
+  const {compare,toggleCompare,requestAddToCart,selectedCity}=useShop();
   const [products,setProducts]=useState<Verified[]>([]),[failed,setFailed]=useState<number[]>([]);
   const [loading,setLoading]=useState(false),[onlyDifferences,setOnlyDifferences]=useState(false),[refresh,setRefresh]=useState(0);
   const ids=compare.slice(0,4).join(",");
@@ -18,21 +18,21 @@ export default function ComparePage(){
     const selected=ids?ids.split(",").map(Number):[];
     if(!selected.length){setProducts([]);setFailed([]);setLoading(false);return;}
     setLoading(true);
-    Promise.allSettled(selected.map(id=>api<Verified>("/api/products/"+id+(refresh?"?fresh=true":""),{signal:controller.signal}))).then(results=>{
+    Promise.allSettled(selected.map(id=>api<Verified>("/api/products/"+id+"?city="+encodeURIComponent(selectedCity)+(refresh?"&fresh=true":""),{signal:controller.signal}))).then(results=>{
       if(controller.signal.aborted)return;
       setProducts(results.flatMap(r=>r.status==="fulfilled"?[r.value]:[]));
       setFailed(results.flatMap((r,i)=>r.status==="rejected"?[selected[i]]:[]));setLoading(false);
     });
     return()=>controller.abort();
-  },[ids,refresh]);
+  },[ids,refresh,selectedCity]);
   const rows=useMemo(()=>{
     const keys=[...new Set(products.flatMap(p=>Object.keys(p.properties||{})))].filter(k=>!/^CML2|ARTIKUL|RECOMMEND/.test(k));
     return [
       {key:"price",label:"Цена",values:products.map(p=>p.price&&p.price>0?p.price.toLocaleString("ru-RU")+" ₸":"По запросу")},
-      {key:"quantity",label:"Общий остаток",values:products.map(p=>typeof p.quantity==="number"?p.quantity+" шт.":"Нет данных")},
+      {key:"quantity",label:"Остаток: "+selectedCity,values:products.map(p=>typeof p.quantity==="number"?p.quantity+" шт.":"Нет данных")},
       ...keys.map(k=>({key:k,label:labels[k]||k.replaceAll("_"," ").toLowerCase(),values:products.map(p=>p.properties?.[k]||"Нет данных")})),
     ].map(row=>({...row,different:new Set(row.values).size>1}));
-  },[products]);
+  },[products,selectedCity]);
   return <section className="container page-shell compare-page">
     <span className="page-eyebrow">ПАСПОРТ СРАВНЕНИЯ · EKT</span>
     <h1>Различия, которые влияют на выбор</h1>

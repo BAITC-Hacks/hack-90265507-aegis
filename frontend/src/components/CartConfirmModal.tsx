@@ -65,7 +65,7 @@ export default function CartConfirmModal() {
           </span>
 
           <span>
-            Доступно
+            {product.stockCity ? "Доступно: "+product.stockCity : "Общий остаток (город проверим при подтверждении)"}
             <strong>{product.quantity} шт.</strong>
           </span>
 

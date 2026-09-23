@@ -68,13 +68,13 @@ test("real catalog candidates support follow-up comparison with fixture details"
  process.env.EKT_API_URL="https://example.test/api";process.env.EKT_API_USER="test";process.env.EKT_API_PASSWORD="test";
  globalThis.fetch=async(input)=>{
   const id=Number(new URL(String(input)).searchParams.get("id"));
-  return new Response(JSON.stringify({id,name:"Legrand 3P 160А",article:String(id),price:id,quantity:2,properties:{NOMINALNYY_TOK:160,KOLICHESTVO_POLYUSOV:3,TORGOVAYA_MARKA:"Legrand"}}));
+  return new Response(JSON.stringify({id,name:"Legrand 3P 160А",article:String(id),price:id,quantity:2,properties:{OBYEM:"Автоматический выключатель",NOMINALNYY_TOK:160,KOLICHESTVO_POLYUSOV:3,TORGOVAYA_MARKA:"Legrand"}}));
  };
  try {
   const r=await processAssistantMessage("Автомат Legrand 3P 160А");
-  assert.equal(r.products.length,2);
+  assert.ok(r.products.length>=2);
   const comparison=await processAssistantMessage("Сравни первые два",r.conversationId);
-  assert.equal(comparison.intent,"compare");assert.deepEqual(comparison.products.map(p=>p.id),r.products.map(p=>p.id));
+  assert.equal(comparison.intent,"compare");assert.deepEqual(comparison.products.map(p=>p.id),r.products.slice(0,2).map(p=>p.id));
   const stock=await processAssistantMessage("Наличие второго",r.conversationId);assert.equal(stock.products[0].id,r.products[1].id);
  }finally{globalThis.fetch=original;for(const k of ["EKT_API_URL","EKT_API_USER","EKT_API_PASSWORD","OPENAI_API_KEY","OPENAI_MODEL"])if(env[k]===undefined)delete process.env[k];else process.env[k]=env[k];}
 });
@@ -95,4 +95,22 @@ test("AI flow sends history and structured plan before grounded explanation (moc
   assert.ok(Array.isArray(JSON.parse(calls[0].input).context.history));
   assert.deepEqual(JSON.parse(calls[1].input).evidence.products,[]);
  }finally{globalThis.fetch=original;if(oldKey===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=oldKey;if(oldModel===undefined)delete process.env.OPENAI_MODEL;else process.env.OPENAI_MODEL=oldModel;}
+});
+
+test("name-based catalog groups narrow the index and unknown groups return empty",()=>{
+ const all=searchCatalog({limit:1});
+ for(const category of ["Автоматика","Кабель и провод","Освещение","Розетки и выключатели","Щитовое оборудование","Инструменты"]){
+  const group=searchCatalog({category,limit:1});assert.ok(group.total>0,category);assert.ok(group.total<all.total,category);
+ }
+ assert.equal(searchCatalog({category:"not-a-group"}).total,0);
+});
+test("analogue requests ask about conflicting source facts instead of guessing",async()=>{
+ const original=globalThis.fetch, saved={...process.env};
+ process.env.EKT_API_URL="https://example.test/api";process.env.EKT_API_USER="test";process.env.EKT_API_PASSWORD="test";delete process.env.OPENAI_API_KEY;delete process.env.OPENAI_MODEL;
+ globalThis.fetch=async()=>new Response(JSON.stringify({id:515291,name:"027228 Автомат 3P 160А",article:"027228",price:100,quantity:0,properties:{NOMINALNYY_TOK:100,KOLICHESTVO_POLYUSOV:3}}));
+ try{
+  await getProductById(515291,true);
+  const result=await processAssistantMessage("Подбери аналог: артикул 027228");
+  assert.equal(result.intent,"analogue");assert.equal(result.products.length,0);assert.match(result.message,/противоречивые/);
+ }finally{globalThis.fetch=original;for(const k of ["EKT_API_URL","EKT_API_USER","EKT_API_PASSWORD","OPENAI_API_KEY","OPENAI_MODEL"])if(saved[k]===undefined)delete process.env[k];else process.env[k]=saved[k];}
 });

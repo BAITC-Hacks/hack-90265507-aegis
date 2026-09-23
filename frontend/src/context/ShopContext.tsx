@@ -102,15 +102,16 @@ export function ShopProvider({ children }: ShopProviderProps) {
     const { product: previous, quantity } = pendingCartItem;
     cartLock.current = true; setCartBusy(true); setCartError("");
     try {
-    const product = await api<Product>("/api/products/" + previous.id + "?fresh=true");
+    const product = await api<Product>("/api/products/" + previous.id + "?fresh=true&city=" + encodeURIComponent(selectedCity));
     if (!Number.isFinite(product.quantity) || product.quantity < 1 || !Number.isFinite(product.price) || product.price <= 0) {
       setCartError("Покупка недоступна: уточните цену и наличие у EKT."); return;
     }
-    if (product.price !== previous.price || product.quantity !== previous.quantity) {
+    if (product.price !== previous.price || product.quantity !== previous.quantity || product.stockCity !== previous.stockCity) {
       setPendingCartItem({product, quantity: Math.min(quantity, Math.floor(product.quantity))});
-      setCartError("Цена или остаток изменились. Проверьте обновлённые данные и подтвердите снова."); return;
+      setCartError("Проверены цена и остаток для выбранного города. Проверьте данные и подтвердите добавление."); return;
     }
 
+    if(cart.some(item=>item.product.id===product.id&&item.product.stockCity!==product.stockCity)){setCartError("Этот товар уже есть в корзине для другого города. Удалите старую позицию перед сменой города.");return;}
     setCart((current) => {
       const existingItem = current.find(
         (item) => item.product.id === product.id

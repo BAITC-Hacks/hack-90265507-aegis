@@ -124,7 +124,7 @@ export default function CartPage() {
                     <CheckCircle2 size={14} />
 
                     В наличии:{" "}
-                    {product.quantity} шт.
+                    {product.quantity} шт. · {product.stockCity||"все склады"}
                   </div>
                 </div>
 
@@ -249,9 +249,9 @@ export default function CartPage() {
             </strong>
           </div>
 
-          <button className="checkout-button">
-            Перейти к оформлению
-          </button>
+          <Link to="/checkout" className="checkout-button">
+            Подготовить заявку
+          </Link>
 
           <p className="checkout-note">
             Оформление заказа будет доступно после

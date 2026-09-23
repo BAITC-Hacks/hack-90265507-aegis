@@ -14,10 +14,12 @@ export type CatalogProduct = {
 
 type SearchOptions = {
   query?: string;
+  all?: boolean;
   page?: number;
   limit?: number;
   brand?: string;
-  sort?: "relevance" | "price-asc" | "price-desc";
+  category?: string;
+  sort?: "relevance" | "price-asc" | "price-desc" | "name";
 };
 
 const catalogPath = path.resolve("data", "catalog.json");
@@ -61,9 +63,11 @@ export function getCatalogProduct(id: number) {
 
 export function searchCatalog({
   query = "",
+  all = false,
   page = 1,
   limit = 24,
   brand = "",
+  category = "",
   sort = "relevance",
 }: SearchOptions) {
   const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
@@ -72,6 +76,16 @@ export function searchCatalog({
   const normalizedQuery = normalize(query);
 
   let results = catalog;
+  // The lightweight API has no category IDs; these are explicit name-based groups.
+  const groups: Record<string, RegExp> = {
+    "Автоматика": /автомат|(?:^|\s)ав\s|контактор|реле|пускател|узо|диф\./i,
+    "Кабель и провод": /кабел|провод|ввг|пвс|сип[- ]/i,
+    "Освещение": /светильник|ламп|прожектор|светодиод/i,
+    "Розетки и выключатели": /розетк|выключател/i,
+    "Щитовое оборудование": /щит|шкаф|бокс|din[- ]|дин[- ]рейк/i,
+    "Инструменты": /инструмент|отвертк|отвёртк|пассатиж|кусач|клещи|перфоратор|дрель|стриппер/i,
+  };
+  if (category) results = groups[category] ? results.filter(p=>groups[category].test(p.name)) : [];
 
   const normalizedBrand = normalize(brand);
   if (normalizedBrand) {
@@ -146,6 +160,7 @@ export function searchCatalog({
   if (sort === "price-asc") results = [...results].sort((a, b) => (a.price > 0 ? a.price : Infinity) - (b.price > 0 ? b.price : Infinity));
   if (sort === "price-desc") results = [...results].sort((a, b) => b.price - a.price);
 
+  if(sort==="name")results=[...results].sort((a,b)=>a.name.localeCompare(b.name,"ru")||a.id-b.id);
   const total = results.length;
   const totalPages = Math.max(
     1,
@@ -153,7 +168,7 @@ export function searchCatalog({
   );
 
   const start = (safePage - 1) * safeLimit;
-  const items = results.slice(
+  const items = all ? results : results.slice(
     start,
     start + safeLimit
   );

@@ -12,24 +12,27 @@ import { useNavigate } from "react-router-dom";
 import AssistantPanel from "../components/AssistantPanel";
 import ProductCard from "../components/ProductCard";
 import { useEffect, useState } from "react";
+import { useShop } from "../context/ShopContext";
 import { api } from "../lib/api";
 import type { Product } from "../types/product";
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const {selectedCity}=useShop();
+  const [heroQuery,setHeroQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [catalogStatus, setCatalogStatus] = useState("Загружаем товары EKT…");
   useEffect(() => {
     const controller = new AbortController();
     api<{items:{id:number}[]}>("/api/catalog/search?limit=4", {signal:controller.signal})
-      .then(data => Promise.allSettled(data.items.map(p => api<Product>("/api/products/"+p.id, {signal:controller.signal}))))
+      .then(data => Promise.allSettled(data.items.map(p => api<Product>("/api/products/"+p.id+"?city="+encodeURIComponent(selectedCity), {signal:controller.signal}))))
       .then(results => {
         if(controller.signal.aborted) return;
         setProducts(results.flatMap(r=>r.status==="fulfilled"?[r.value]:[]));
         setCatalogStatus(results.some(r=>r.status==="rejected")?"Часть товаров недоступна. Проверьте подключение EKT API.":"");
       }).catch(()=>{if(!controller.signal.aborted)setCatalogStatus("Не удалось получить товары EKT. Проверьте настройки API.");});
     return ()=>controller.abort();
-  }, []);
+  }, [selectedCity]);
 
   return (
     <>
@@ -57,6 +60,7 @@ export default function HomePage() {
               <Search size={21} />
 
               <input
+                value={heroQuery} onChange={e=>setHeroQuery(e.target.value)}
                 placeholder="Например: автомат Legrand, 3P, 160A, 18kA"
                 onKeyDown={(event) => {
                   if (event.key !== "Enter") {
@@ -76,7 +80,7 @@ export default function HomePage() {
 
               <button
                 onClick={() =>
-                  navigate("/catalog")
+                  navigate("/catalog?q="+encodeURIComponent(heroQuery.trim()))
                 }
               >
                 Найти
@@ -197,7 +201,7 @@ export default function HomePage() {
               </strong>
 
               <small>
-                В разработке: Excel, PDF, Word
+                XLSX, PDF, DOCX, CSV
               </small>
             </span>
 
@@ -219,7 +223,7 @@ export default function HomePage() {
               </strong>
 
               <small>
-                В разработке
+                Распознавание маркировки
               </small>
             </span>
 
@@ -229,7 +233,7 @@ export default function HomePage() {
           <button
             onClick={() =>
               navigate(
-                "/catalog?mode=analogue"
+                "/analogue"
               )
             }
           >

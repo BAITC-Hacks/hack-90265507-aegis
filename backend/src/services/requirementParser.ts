@@ -1,5 +1,9 @@
+import { parsePrice, type PriceFilter, CITIES } from "./productFilters.js";
 export type ProductRequirements = {
   originalQuery: string;
+  price?: PriceFilter;
+  inStock?: boolean;
+  city?: string;
 
   brand?: string;
   productType?: string;
@@ -24,6 +28,7 @@ const PRODUCT_TYPES = [
     value: "Автоматический выключатель",
     keywords: [
       "автоматический выключатель",
+      "автоматические выключатели",
       "автомат",
       "автоматы",
     ],
@@ -74,6 +79,7 @@ function normalize(value: string) {
 function extractBrand(
   normalized: string
 ): string | undefined {
+  if(/schneider|шнайдер/i.test(normalized))return "Schneider Electric";
   return BRANDS.find((brand) =>
     normalized.includes(
       brand.toLowerCase()
@@ -179,13 +185,16 @@ function extractArticle(
 export function parseRequirements(
   message: string
 ): ProductRequirements {
-  const normalized =
-    normalize(message);
+  const parsedPrice=parsePrice(message);
+  const normalized = normalize(parsedPrice.textWithoutPrice);
 
   return {
     originalQuery:
       message.trim(),
 
+    price: parsedPrice.filter,
+    inStock: /только.*налич|в наличии|есть на складе/i.test(message)?true:/любо[ей].*налич|неважно.*налич/i.test(message)?false:undefined,
+    city: CITIES.find(c=>message.toLowerCase().includes(c.toLowerCase())) || (/нур[- ]султан/i.test(message)?"Астана":undefined),
     brand:
       extractBrand(normalized),
 
@@ -204,6 +213,6 @@ export function parseRequirements(
       extractVoltage(normalized),
 
     article:
-      extractArticle(message),
+      extractArticle(parsedPrice.textWithoutPrice),
   };
 }

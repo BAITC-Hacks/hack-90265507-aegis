@@ -12,6 +12,7 @@ export type ConversationTurn = {
 
 export type ConversationState = {
   id: string;
+  selectedCity?: string;
 
   requirements:
     ProductRequirements;

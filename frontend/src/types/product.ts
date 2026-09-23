@@ -6,6 +6,8 @@ export type StoreStock = {
 
 export type Product = {
   id: number;
+  totalQuantity?: number|null;
+  stockCity?: string|null;
   name: string;
   article: string;
 

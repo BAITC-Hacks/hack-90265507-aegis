@@ -1,3 +1,6 @@
+import { parseCatalogOptions, searchVerifiedCatalog } from "./services/verifiedCatalog.js";
+import { cityQuantity } from "./services/productFilters.js";
+import { aiConfigured } from "./services/aiService.js";
 import "dotenv/config";
 
 import express from "express";
@@ -96,9 +99,9 @@ app.get(
           id, req.query.fresh === "true"
         );
 
-      return res.json(
-        product
-      );
+      const city=typeof req.query.city==="string"?req.query.city.trim():undefined;
+      if(city&&city.length>80)return res.status(400).json({error:"Некорректный город"});
+      return res.json({...product,totalQuantity:product.quantity,quantity:city?cityQuantity(product,city):product.quantity,stockCity:city||null});
     } catch (error) {
       console.error(
         "Failed to fetch EKT product:",
@@ -125,53 +128,14 @@ app.get(
   }
 );
 
-app.get(
-  "/api/catalog/search",
-  (req, res) => {
-    try {
-      const query =
-        typeof req.query.q ===
-        "string"
-          ? req.query.q
-          : "";
-
-      const page =
-        Number(
-          req.query.page
-        ) || 1;
-
-      const limit =
-        Number(
-          req.query.limit
-        ) || 24;
-
-      const results =
-        searchCatalog({
-          query,
-          brand: typeof req.query.brand === "string" ? req.query.brand : "",
-          sort: req.query.sort === "price-asc" || req.query.sort === "price-desc" ? req.query.sort : "relevance",
-          page,
-          limit,
-        });
-
-      return res.json(
-        results
-      );
-    } catch (error) {
-      console.error(
-        "Catalog search failed:",
-        error
-      );
-
-      return res
-        .status(500)
-        .json({
-          error:
-            "Catalog search failed",
-        });
-    }
-  }
-);
+app.get("/api/catalog/search", async (req,res)=>{
+  let options;
+  try { options=parseCatalogOptions(req.query); }
+  catch(error){return res.status(400).json({error:error instanceof Error?error.message:"Некорректные фильтры"});}
+  try {return res.json(await searchVerifiedCatalog(options));}
+  catch {return res.status(502).json({error:"Не удалось проверить каталог EKT"});}
+});
+app.get("/api/assistant/status",(_req,res)=>res.json({configured:aiConfigured(),missing:["OPENAI_API_KEY","OPENAI_MODEL"].filter(key=>!process.env[key])}));
 
 app.post(
   "/api/assistant/chat",
@@ -204,7 +168,7 @@ app.post(
       const result =
         await processAssistantMessage(
           message,
-          conversationId
+          conversationId, typeof req.body.city==="string"&&req.body.city.length<=80?req.body.city:undefined
         );
 
       return res.json(

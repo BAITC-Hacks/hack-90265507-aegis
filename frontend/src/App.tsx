@@ -12,11 +12,18 @@ import SpecificationPage from "./pages/SpecificationPage";
 import IdentifyPage from "./pages/IdentifyPage";
 import ProfilePage from "./pages/ProfilePage";
 
+import InfoPage from "./pages/InfoPage";
+import CheckoutPage from "./pages/CheckoutPage";
+import AnaloguePage from "./pages/AnaloguePage";
+import "./tasks.css";
 export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/help/:topic" element={<InfoPage />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/analogue" element={<AnaloguePage />} />
 
         <Route path="/catalog" element={<CatalogPage />} />
 

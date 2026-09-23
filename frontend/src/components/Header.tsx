@@ -53,6 +53,7 @@ export default function Header({
     favorites,
     compare,
     selectedCity,
+    setSelectedCity,
   } = useShop();
 
   const [
@@ -83,24 +84,20 @@ export default function Header({
     <header>
       <div className="utility-bar">
         <div className="container utility-inner">
-          <button className="location-button">
-            <MapPin size={15} />
-            {selectedCity}
-            <ChevronDown
-              size={14}
-            />
-          </button>
+          <label className="location-button"><MapPin size={15}/><select aria-label="Город" value={selectedCity} onChange={e=>{setSelectedCity(e.target.value);if(window.location.pathname==="/catalog"){const params=new URLSearchParams(window.location.search);params.set("city",e.target.value);params.set("page","1");navigate("/catalog?"+params);}}}>
+            {["Астана","Алматы","Шымкент","Караганда","Актобе","Атырау",...(!["Астана","Алматы","Шымкент","Караганда","Актобе","Атырау"].includes(selectedCity)?[selectedCity]:[])].map(city=><option key={city}>{city}</option>)}
+          </select></label>
 
           <div className="utility-links">
-            <button>
+            <button onClick={()=>navigate("/help/delivery")}>
               Доставка и оплата
             </button>
 
-            <button>
+            <button onClick={()=>navigate("/help/business")}>
               Для бизнеса
             </button>
 
-            <button>
+            <button onClick={()=>navigate("/help/contacts")}>
               Контакты
             </button>
           </div>

@@ -82,7 +82,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </Link>
 
         <span className="article">
-          Арт. {product.article}
+          Арт. {product.article} {product.stockCity&&" · "+product.stockCity}
         </span>
 
         <div className={`stock ${!inStock ? "stock-out" : ""}`}>

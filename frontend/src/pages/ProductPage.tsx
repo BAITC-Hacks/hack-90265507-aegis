@@ -32,7 +32,7 @@ import {
 import { useShop } from "../context/ShopContext";
 import type { Product } from "../types/product";
 
-const API_URL = "http://localhost:3001";
+import { API_URL } from "../lib/api";
 
 function formatPrice(price: number) {
   return new Intl.NumberFormat("ru-RU").format(price);
@@ -68,6 +68,7 @@ export default function ProductPage() {
   const { id } = useParams();
 
   const {
+    selectedCity,
     favorites,
     compare,
     toggleFavorite,
@@ -98,7 +99,7 @@ export default function ProductPage() {
         setError("");
 
         const response = await fetch(
-          `${API_URL}/api/products/${id}`,
+          `${API_URL}/api/products/${id}?city=${encodeURIComponent(selectedCity)}`,
           {
             signal: controller.signal,
           }
@@ -113,6 +114,7 @@ export default function ProductPage() {
         const data = (await response.json()) as Product;
 
         setProduct(data);
+        setQuantity(1);
       } catch (err) {
         if (
           err instanceof DOMException &&
@@ -136,7 +138,7 @@ export default function ProductPage() {
     loadProduct();
 
     return () => controller.abort();
-  }, [id]);
+  }, [id,selectedCity]);
 
   const propertyEntries = useMemo(() => {
     if (!product?.properties) {
@@ -335,12 +337,12 @@ export default function ProductPage() {
               {inStock ? (
                 <>
                   <Check size={16} />
-                  В наличии · {product.quantity} шт.
+                  {selectedCity}: в наличии · {product.quantity} шт.
                 </>
               ) : (
                 <>
                   <AlertTriangle size={16} />
-                  Нет в наличии
+                  {typeof product.quantity==="number"?selectedCity+": нет в наличии":selectedCity+": остаток не подтверждён"}
                 </>
               )}
             </div>
@@ -495,10 +497,10 @@ export default function ProductPage() {
           </div>
 
           <div className="warehouse-total">
-            <span>Общий остаток</span>
+            <span>Остаток: {selectedCity}</span>
 
             <strong>
-              {product.quantity} шт.
+              {typeof product.quantity==="number"?product.quantity+" шт.":"Не подтверждён"}
             </strong>
           </div>
 

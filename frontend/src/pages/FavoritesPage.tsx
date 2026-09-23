@@ -17,7 +17,7 @@ import { useShop } from "../context/ShopContext";
 
 import type { Product } from "../types/product";
 
-const API_URL = "http://localhost:3001";
+import { API_URL } from "../lib/api";
 
 function formatPrice(price: number) {
   return new Intl.NumberFormat("ru-RU").format(price);
@@ -25,6 +25,7 @@ function formatPrice(price: number) {
 
 export default function FavoritesPage() {
   const {
+    selectedCity,
     favorites,
     toggleFavorite,
     requestAddToCart,
@@ -56,7 +57,7 @@ export default function FavoritesPage() {
         const results = await Promise.all(
           favorites.map(async (id) => {
             const response = await fetch(
-              `${API_URL}/api/products/${id}`,
+              `${API_URL}/api/products/${id}?city=${encodeURIComponent(selectedCity)}`,
               {
                 signal: controller.signal,
               }
@@ -98,7 +99,7 @@ export default function FavoritesPage() {
     return () => {
       controller.abort();
     };
-  }, [favorites]);
+  }, [favorites,selectedCity]);
 
   if (loading) {
     return (
@@ -247,7 +248,7 @@ export default function FavoritesPage() {
                   <span />
 
                   {inStock
-                    ? `В наличии · ${product.quantity} шт.`
+                    ? `${selectedCity}: в наличии · ${product.quantity} шт.`
                     : "Нет в наличии"}
                 </div>
 
