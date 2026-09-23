@@ -9,11 +9,27 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import AssistantPanel from "../components/AssistantPanel";
 import ProductCard from "../components/ProductCard";
-import { products } from "../data/products";
+import { useEffect, useState } from "react";
+import { api } from "../lib/api";
+import type { Product } from "../types/product";
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [catalogStatus, setCatalogStatus] = useState("Загружаем товары EKT…");
+  useEffect(() => {
+    const controller = new AbortController();
+    api<{items:{id:number}[]}>("/api/catalog/search?limit=4", {signal:controller.signal})
+      .then(data => Promise.allSettled(data.items.map(p => api<Product>("/api/products/"+p.id, {signal:controller.signal}))))
+      .then(results => {
+        if(controller.signal.aborted) return;
+        setProducts(results.flatMap(r=>r.status==="fulfilled"?[r.value]:[]));
+        setCatalogStatus(results.some(r=>r.status==="rejected")?"Часть товаров недоступна. Проверьте подключение EKT API.":"");
+      }).catch(()=>{if(!controller.signal.aborted)setCatalogStatus("Не удалось получить товары EKT. Проверьте настройки API.");});
+    return ()=>controller.abort();
+  }, []);
 
   return (
     <>
@@ -33,8 +49,8 @@ export default function HomePage() {
 
             <p>
               Найдите оборудование по названию, артикулу,
-              техническим требованиям, фотографии или
-              спецификации.
+              техническим требованиям. Сравнивайте данные
+              и уточняйте выбор в чате.
             </p>
 
             <div className="hero-search">
@@ -43,9 +59,12 @@ export default function HomePage() {
               <input
                 placeholder="Например: автомат Legrand, 3P, 160A, 18kA"
                 onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
+                  if (event.key !== "Enter") {
+                    return;
+                  }
 
-                  const query = event.currentTarget.value.trim();
+                  const query =
+                    event.currentTarget.value.trim();
 
                   if (query) {
                     navigate(
@@ -56,7 +75,9 @@ export default function HomePage() {
               />
 
               <button
-                onClick={() => navigate("/catalog")}
+                onClick={() =>
+                  navigate("/catalog")
+                }
               >
                 Найти
                 <ArrowRight size={18} />
@@ -68,7 +89,9 @@ export default function HomePage() {
 
               <button
                 onClick={() =>
-                  navigate("/catalog?q=автомат 3P 160A")
+                  navigate(
+                    "/catalog?q=автомат 3P 160A"
+                  )
                 }
               >
                 Автомат 3P 160A
@@ -76,7 +99,9 @@ export default function HomePage() {
 
               <button
                 onClick={() =>
-                  navigate("/catalog?q=кабель")
+                  navigate(
+                    "/catalog?q=кабель"
+                  )
                 }
               >
                 Кабель
@@ -84,7 +109,9 @@ export default function HomePage() {
 
               <button
                 onClick={() =>
-                  navigate("/catalog?q=розетка IP44")
+                  navigate(
+                    "/catalog?q=розетка IP44"
+                  )
                 }
               >
                 Розетка IP44
@@ -100,25 +127,37 @@ export default function HomePage() {
                 </div>
 
                 <div>
-                  <strong>Точный подбор</strong>
-                  <span>По техническим требованиям</span>
+                  <strong>
+                    Точный подбор
+                  </strong>
+
+                  <span>
+                    По техническим требованиям
+                  </span>
                 </div>
               </div>
 
               <div className="requirement">
                 <span>Запрос</span>
-                <p>Автомат · 3P · 160А · ≥18kA</p>
+                <p>
+                  Автомат · 3P · 160А · ≥18kA
+                </p>
               </div>
 
               <div className="match-card">
                 <div className="match-status">
                   <span className="status-dot" />
-                  Соответствие
-                  <b>98%</b>
+                  Пример запроса
+                  <b>ДЕМО</b>
                 </div>
 
-                <strong>DRX250 MT 3P 160А</strong>
-                <small>Legrand</small>
+                <strong>
+                  DRX250 MT 3P 160А
+                </strong>
+
+                <small>
+                  Legrand
+                </small>
 
                 <div className="match-specs">
                   <span>3P ✓</span>
@@ -127,8 +166,13 @@ export default function HomePage() {
                 </div>
 
                 <div className="match-bottom">
-                  <strong>64 920 ₸</strong>
-                  <span>23 шт.</span>
+                  <strong>
+                    Цена из API
+                  </strong>
+
+                  <span>
+                    Остаток из API
+                  </span>
                 </div>
               </div>
             </div>
@@ -136,55 +180,95 @@ export default function HomePage() {
         </div>
 
         <div className="quick-tools">
-          <button onClick={() => navigate("/specification")}>
+          <button
+            onClick={() =>
+              navigate(
+                "/specification"
+              )
+            }
+          >
             <span className="quick-icon">
               <FileSpreadsheet />
             </span>
 
             <span>
-              <strong>Спецификация</strong>
-              <small>Excel, PDF или Word</small>
-            </span>
+              <strong>
+                Спецификация
+              </strong>
 
-            <ArrowRight />
-          </button>
-
-          <button onClick={() => navigate("/identify")}>
-            <span className="quick-icon">
-              <Camera />
-            </span>
-
-            <span>
-              <strong>Поиск по фото</strong>
-              <small>Оборудование и маркировка</small>
+              <small>
+                В разработке: Excel, PDF, Word
+              </small>
             </span>
 
             <ArrowRight />
           </button>
 
           <button
-            onClick={() => navigate("/catalog?mode=analogue")}
+            onClick={() =>
+              navigate("/identify")
+            }
+          >
+            <span className="quick-icon">
+              <Camera />
+            </span>
+
+            <span>
+              <strong>
+                Поиск по фото
+              </strong>
+
+              <small>
+                В разработке
+              </small>
+            </span>
+
+            <ArrowRight />
+          </button>
+
+          <button
+            onClick={() =>
+              navigate(
+                "/catalog?mode=analogue"
+              )
+            }
           >
             <span className="quick-icon">
               <GitCompareArrows />
             </span>
 
             <span>
-              <strong>Подобрать аналог</strong>
-              <small>По характеристикам</small>
+              <strong>
+                Подобрать аналог
+              </strong>
+
+              <small>
+                По характеристикам
+              </small>
             </span>
 
             <ArrowRight />
           </button>
 
-          <button onClick={() => navigate("/specification")}>
+          <button
+            onClick={() =>
+              navigate(
+                "/specification"
+              )
+            }
+          >
             <span className="quick-icon">
               <ClipboardList />
             </span>
 
             <span>
-              <strong>Собрать закупку</strong>
-              <small>Список оборудования</small>
+              <strong>
+                Собрать закупку
+              </strong>
+
+              <small>
+                Список оборудования
+              </small>
             </span>
 
             <ArrowRight />
@@ -192,26 +276,62 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="container assistant-home-section">
+        <div className="assistant-home-heading">
+          <div>
+            <span className="assistant-home-eyebrow">
+              EKTiQ ASSISTANT
+            </span>
+
+            <h2>
+              Опишите задачу обычными словами
+            </h2>
+
+            <p>
+              EKTiQ поймёт технические требования,
+              проверит каталог EKT и покажет
+              подходящие товары.
+            </p>
+          </div>
+
+          <div className="assistant-home-status">
+            <span />
+            Каталог EKT подключён
+          </div>
+        </div>
+
+        <AssistantPanel />
+      </section>
+
       <section className="container catalog-section">
         <div className="section-heading">
           <div>
             <span>КАТАЛОГ</span>
-            <h2>Популярные товары</h2>
+            <h2>
+              Товары из каталога EKT
+            </h2>
           </div>
 
-          <button onClick={() => navigate("/catalog")}>
+          <button
+            onClick={() =>
+              navigate("/catalog")
+            }
+          >
             Смотреть все
             <ArrowRight size={17} />
           </button>
         </div>
 
+        {catalogStatus && <p role="status">{catalogStatus}</p>}
         <div className="product-grid">
-          {products.slice(0, 4).map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-            />
-          ))}
+          {products
+            .slice(0, 4)
+            .map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+              />
+            ))}
         </div>
       </section>
     </>

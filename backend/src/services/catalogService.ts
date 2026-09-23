@@ -16,6 +16,8 @@ type SearchOptions = {
   query?: string;
   page?: number;
   limit?: number;
+  brand?: string;
+  sort?: "relevance" | "price-asc" | "price-desc";
 };
 
 const catalogPath = path.resolve("data", "catalog.json");
@@ -26,6 +28,9 @@ function normalize(value: string) {
   return value
     .toLowerCase()
     .replace(/ё/g, "е")
+    .replace(/автоматический выключатель|автомат(?:ы)?|(?:^|\s)ав(?=\s)/g, "автомат")
+    .replace(/(\d+)\s*[aа](?=\s|$|[,.;])/g, "$1а")
+    .replace(/(\d+)\s*[pпф](?=\s|$|[,.;])/g, "$1p")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
@@ -58,20 +63,30 @@ export function searchCatalog({
   query = "",
   page = 1,
   limit = 24,
+  brand = "",
+  sort = "relevance",
 }: SearchOptions) {
-  const safePage = Math.max(1, page);
-  const safeLimit = Math.min(Math.max(1, limit), 100);
+  const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+  const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(1, Math.floor(limit)), 100) : 24;
 
   const normalizedQuery = normalize(query);
 
   let results = catalog;
+
+  const normalizedBrand = normalize(brand);
+  if (normalizedBrand) {
+    results = results.filter((product) => {
+      const searchableBrand = normalize(product.name);
+      return searchableBrand.includes(normalizedBrand);
+    });
+  }
 
   if (normalizedQuery) {
     const tokens = normalizedQuery
       .split(" ")
       .filter(Boolean);
 
-    results = catalog
+    results = results
       .map((product) => {
         const normalizedName = normalize(product.name);
         const normalizedArticle = normalize(product.article ?? "");
@@ -110,7 +125,7 @@ export function searchCatalog({
           ),
         };
       })
-      .filter((result) => result.score > 0)
+      .filter((result) => result.matchesAll)
       .sort((a, b) => {
         if (a.matchesAll !== b.matchesAll) {
           return a.matchesAll ? -1 : 1;
@@ -127,6 +142,9 @@ export function searchCatalog({
       })
       .map((result) => result.product);
   }
+
+  if (sort === "price-asc") results = [...results].sort((a, b) => (a.price > 0 ? a.price : Infinity) - (b.price > 0 ? b.price : Infinity));
+  if (sort === "price-desc") results = [...results].sort((a, b) => b.price - a.price);
 
   const total = results.length;
   const totalPages = Math.max(

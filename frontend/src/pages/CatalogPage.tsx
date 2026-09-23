@@ -29,7 +29,7 @@ import type {
 
 import type { Product } from "../types/product";
 
-const API_URL = "http://localhost:3001";
+import { API_URL } from "../lib/api";
 
 function formatPrice(price: number) {
   return new Intl.NumberFormat("ru-RU").format(price);
@@ -74,6 +74,10 @@ export default function CatalogPage() {
   const [cartLoadingId, setCartLoadingId] =
     useState<number | null>(null);
 
+
+  const [brand, setBrand] = useState("");
+  const [sort, setSort] = useState("relevance");
+
   useEffect(() => {
     setInput(query);
   }, [query]);
@@ -91,7 +95,7 @@ export default function CatalogPage() {
           new URLSearchParams({
             q: query,
             page: String(page),
-            limit: "24",
+            limit: "24", brand, sort,
           });
 
         const response = await fetch(
@@ -137,7 +141,7 @@ export default function CatalogPage() {
 
     return () =>
       controller.abort();
-  }, [query, page]);
+  }, [query, page, brand, sort]);
 
   function handleSearch(
     event: FormEvent
@@ -300,24 +304,13 @@ export default function CatalogPage() {
 
       <div className="catalog-toolbar">
         <div className="catalog-filter-pills">
-          <button type="button">
-            В наличии
-          </button>
+  <span>Остатки проверяются в карточке товара</span>
+  <button type="button" className={brand === "Legrand" ? "active" : ""} onClick={() => setBrand((value) => value === "Legrand" ? "" : "Legrand")}>Legrand</button>
+  <button type="button" className={brand === "Schneider Electric" ? "active" : ""} onClick={() => setBrand((value) => value === "Schneider Electric" ? "" : "Schneider Electric")}>Schneider Electric</button>
+  <button type="button" className={brand === "ABB" ? "active" : ""} onClick={() => setBrand((value) => value === "ABB" ? "" : "ABB")}>ABB</button>
+</div>
 
-          <button type="button">
-            Legrand
-          </button>
-
-          <button type="button">
-            Schneider Electric
-          </button>
-
-          <button type="button">
-            ABB
-          </button>
-        </div>
-
-        <select defaultValue="relevance">
+        <select value={sort} onChange={(event) => setSort(event.target.value)}>
           <option value="relevance">
             По соответствию
           </option>

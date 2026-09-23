@@ -38,7 +38,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             !inStock ? "product-badge-out" : ""
           }`}
         >
-          {inStock ? "В наличии" : "Нет в наличии"}
+          {typeof product.quantity !== "number" ? "Наличие уточняется" : inStock ? "В наличии" : typeof product.quantity !== "number" ? "Наличие уточняется" : "Нет в наличии"}
         </span>
 
         <div className="product-card-actions">
@@ -93,7 +93,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         <div className="product-bottom">
-          <strong>{formatPrice(product.price)} ₸</strong>
+          <strong>{product.price > 0 ? formatPrice(product.price) + " ₸" : "Цена по запросу"}</strong>
 
           <button
             className="add-cart"

@@ -170,7 +170,10 @@ function extractArticle(
     /(?:арт(?:икул)?\.?\s*[:#-]?\s*)([A-Za-zА-Яа-я0-9_-]+)/i
   );
 
-  return match?.[1];
+  if (match?.[1]) return match[1];
+
+  const bareArticle = original.match(/\b\d{5,}\b/);
+  return bareArticle?.[0];
 }
 
 export function parseRequirements(

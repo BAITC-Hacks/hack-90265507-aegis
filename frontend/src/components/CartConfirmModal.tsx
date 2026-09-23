@@ -9,6 +9,7 @@ function formatPrice(price: number) {
 export default function CartConfirmModal() {
   const {
     pendingCartItem,
+    cartError, cartBusy,
     confirmAddToCart,
     cancelAddToCart,
   } = useShop();
@@ -76,6 +77,7 @@ export default function CartConfirmModal() {
           </span>
         </div>
 
+        {cartError && <p role="alert" className="assistant-error">{cartError}</p>}
         <div className="modal-buttons">
           <button
             className="modal-cancel"
@@ -86,10 +88,11 @@ export default function CartConfirmModal() {
 
           <button
             className="modal-confirm"
+            disabled={cartBusy}
             onClick={confirmAddToCart}
           >
             <Check size={18} />
-            Да, добавить
+            {cartBusy ? "Проверяем наличие…" : "Да, добавить"}
           </button>
         </div>
       </div>

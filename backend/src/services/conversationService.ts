@@ -2,6 +2,8 @@ import type {
   ProductRequirements,
 } from "./requirementParser.js";
 
+import { randomUUID } from "node:crypto";
+
 export type ConversationTurn = {
   role: "user" | "assistant";
   content: string;
@@ -19,6 +21,7 @@ export type ConversationState = {
 
   createdAt: number;
   updatedAt: number;
+  lastProductIds: number[];
 };
 
 const conversations =
@@ -28,16 +31,16 @@ const conversations =
   >();
 
 const MAX_TURNS = 20;
+const CONVERSATION_TTL_MS = 30 * 60 * 1000;
 
 function generateConversationId() {
-  return (
-    "conv_" +
-    Date.now().toString(36) +
-    "_" +
-    Math.random()
-      .toString(36)
-      .slice(2, 10)
-  );
+  return `conv_${randomUUID()}`;
+}
+
+function removeExpiredConversations(now = Date.now()) {
+  for (const [id, conversation] of conversations) {
+    if (now - conversation.updatedAt > CONVERSATION_TTL_MS) conversations.delete(id);
+  }
 }
 
 function emptyRequirements():
@@ -50,6 +53,8 @@ function emptyRequirements():
 export function createConversation():
   ConversationState {
   const now = Date.now();
+  removeExpiredConversations(now);
+  if (conversations.size >= 1000) conversations.delete(conversations.keys().next().value!);
 
   const conversation:
     ConversationState = {
@@ -63,6 +68,8 @@ export function createConversation():
 
     createdAt: now,
     updatedAt: now,
+
+    lastProductIds: [],
   };
 
   conversations.set(
@@ -86,6 +93,7 @@ export function getConversation(
 export function getOrCreateConversation(
   id?: string
 ): ConversationState {
+  removeExpiredConversations();
   if (id) {
     const existing =
       getConversation(id);
@@ -127,6 +135,14 @@ export function addConversationTurn(
 
   conversation.updatedAt =
     Date.now();
+}
+
+export function updateConversationProducts(
+  conversation: ConversationState,
+  productIds: number[]
+) {
+  conversation.lastProductIds = productIds.slice(0, 8);
+  conversation.updatedAt = Date.now();
 }
 
 export function updateConversationRequirements(

@@ -6,7 +6,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "sync:catalog": "tsx src/scripts/syncCatalog.ts"
+    "sync:catalog": "tsx src/scripts/syncCatalog.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/services/*.test.ts"
   },
   "keywords": [],
   "author": "",

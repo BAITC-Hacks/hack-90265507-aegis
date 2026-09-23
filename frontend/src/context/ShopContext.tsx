@@ -2,10 +2,12 @@ import {
   createContext,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 
+import { api } from "../lib/api";
 import type { CartItem, Product } from "../types/product";
 
 type PendingCartItem = {
@@ -20,6 +22,8 @@ type ShopContextValue = {
   selectedCity: string;
 
   pendingCartItem: PendingCartItem | null;
+  cartError: string;
+  cartBusy: boolean;
 
   toggleFavorite: (productId: number) => void;
   toggleCompare: (productId: number) => void;
@@ -53,6 +57,10 @@ export function ShopProvider({ children }: ShopProviderProps) {
   const [pendingCartItem, setPendingCartItem] =
     useState<PendingCartItem | null>(null);
 
+  const [cartError, setCartError] = useState("");
+  const [cartBusy, setCartBusy] = useState(false);
+  const cartLock = useRef(false);
+
   function toggleFavorite(productId: number) {
     setFavorites((current) =>
       current.includes(productId)
@@ -70,13 +78,14 @@ export function ShopProvider({ children }: ShopProviderProps) {
   }
 
   function requestAddToCart(product: Product, quantity = 1) {
-    if (product.quantity <= 0) {
+    if (cartLock.current || !Number.isFinite(quantity) || !Number.isFinite(product.quantity) || product.quantity < 1) {
       return;
     }
 
+    setCartError("");
     const safeQuantity = Math.max(
       1,
-      Math.min(quantity, product.quantity)
+      Math.floor(Math.min(quantity, product.quantity))
     );
 
     setPendingCartItem({
@@ -85,12 +94,22 @@ export function ShopProvider({ children }: ShopProviderProps) {
     });
   }
 
-  function confirmAddToCart() {
-    if (!pendingCartItem) {
+  async function confirmAddToCart() {
+    if (!pendingCartItem || cartLock.current) {
       return;
     }
 
-    const { product, quantity } = pendingCartItem;
+    const { product: previous, quantity } = pendingCartItem;
+    cartLock.current = true; setCartBusy(true); setCartError("");
+    try {
+    const product = await api<Product>("/api/products/" + previous.id + "?fresh=true");
+    if (!Number.isFinite(product.quantity) || product.quantity < 1 || !Number.isFinite(product.price) || product.price <= 0) {
+      setCartError("Покупка недоступна: уточните цену и наличие у EKT."); return;
+    }
+    if (product.price !== previous.price || product.quantity !== previous.quantity) {
+      setPendingCartItem({product, quantity: Math.min(quantity, Math.floor(product.quantity))});
+      setCartError("Цена или остаток изменились. Проверьте обновлённые данные и подтвердите снова."); return;
+    }
 
     setCart((current) => {
       const existingItem = current.find(
@@ -105,6 +124,7 @@ export function ShopProvider({ children }: ShopProviderProps) {
 
           return {
             ...item,
+            product,
             quantity: Math.min(
               item.quantity + quantity,
               product.quantity
@@ -123,13 +143,19 @@ export function ShopProvider({ children }: ShopProviderProps) {
     });
 
     setPendingCartItem(null);
+    } catch { setCartError("Не удалось проверить наличие. Корзина не изменена. Повторите попытку."); }
+    finally { cartLock.current = false; setCartBusy(false); }
   }
 
   function cancelAddToCart() {
+    if (cartLock.current) return;
+    setCartError("");
     setPendingCartItem(null);
   }
 
   function updateCartQuantity(productId: number, quantity: number) {
+    if (!Number.isFinite(quantity)) return;
+    quantity = Math.floor(quantity);
     setCart((current) =>
       current.map((item) => {
         if (item.product.id !== productId) {
@@ -180,6 +206,7 @@ export function ShopProvider({ children }: ShopProviderProps) {
         cart,
         selectedCity,
         pendingCartItem,
+        cartError, cartBusy,
 
         toggleFavorite,
         toggleCompare,

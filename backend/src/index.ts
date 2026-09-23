@@ -26,8 +26,39 @@ const PORT =
   Number(process.env.PORT) ||
   3001;
 
-app.use(cors());
-app.use(express.json());
+const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const requestCounts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 20;
+
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(express.json({ limit: "32kb" }));
+
+app.use("/api/assistant", (req, res, next) => {
+  const now = Date.now();
+  for (const [ip, value] of requestCounts) if (value.resetAt <= now) requestCounts.delete(ip);
+  if (requestCounts.size > 10000) return res.status(503).json({error: "Service busy"});
+  const key = req.ip || "unknown";
+  const current = requestCounts.get(key);
+  const entry = !current || current.resetAt <= now
+    ? { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS }
+    : current;
+
+  entry.count += 1;
+  requestCounts.set(key, entry);
+
+  if (entry.count > RATE_LIMIT_MAX) {
+    return res.status(429).json({
+      error: "Too many assistant requests. Try again shortly.",
+    });
+  }
+
+  return next();
+});
 
 app.get(
   "/",
@@ -62,7 +93,7 @@ app.get(
 
       const product =
         await getProductById(
-          id
+          id, req.query.fresh === "true"
         );
 
       return res.json(
@@ -117,6 +148,8 @@ app.get(
       const results =
         searchCatalog({
           query,
+          brand: typeof req.query.brand === "string" ? req.query.brand : "",
+          sort: req.query.sort === "price-asc" || req.query.sort === "price-desc" ? req.query.sort : "relevance",
           page,
           limit,
         });
@@ -159,7 +192,7 @@ app.post(
               .conversationId
           : undefined;
 
-      if (!message.trim()) {
+      if (!message.trim() || message.length > 2000) {
         return res
           .status(400)
           .json({

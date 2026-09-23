@@ -1,0 +1,20 @@
+.compare-toolbar,.chat-shortcuts{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:18px 0}
+.compare-toolbar button,.chat-shortcuts button,.chat-shortcuts a{border:1px solid #d8e0ed;border-radius:10px;padding:9px 12px;background:white;color:#294365;font:inherit;cursor:pointer}
+.compare-scroll{overflow:auto;border:1px solid #d8e0ed;border-radius:16px;margin:24px 0}
+.compare-table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+.compare-table th,.compare-table td{min-width:220px;max-width:340px;padding:18px;text-align:left;vertical-align:top;border-bottom:1px solid #e4eaf1;border-right:1px solid #e4eaf1;overflow-wrap:anywhere}
+.compare-table th:first-child{min-width:170px;position:sticky;left:0;background:#f4f7fb;z-index:1}
+.compare-table thead th{background:#edf4ff}
+.compare-table small{display:block;margin:8px 0;color:#5e6c80}
+.compare-table a{color:#1d56b5}
+.compare-table button{margin-top:10px}
+.compare-difference td{background:#fff8e9}
+.compare-conflict{display:flex;gap:6px;align-items:flex-start;color:#87520a;background:#fff2d9;padding:10px;border-radius:8px;font-size:12px}
+.compare-conflict svg{flex-shrink:0}
+.assistant-mode{background:#fff3d9;color:#754900;padding:10px 14px;font-size:12px}
+.assistant-bubble{white-space:pre-wrap;overflow-wrap:anywhere}
+.chat-shortcuts{padding:0 14px;gap:7px;margin:10px 0;font-size:12px}
+.assistant-product-footer small,.assistant-product-footer a{display:block;font-size:11px;margin-top:6px}
+.assistant-product-actions{display:flex;gap:6px;flex-wrap:wrap}
+button:disabled{cursor:not-allowed;opacity:.55}
+@media(max-width:640px){.compare-table th,.compare-table td{min-width:185px;padding:12px}.compare-table th:first-child{min-width:120px;max-width:140px}}
