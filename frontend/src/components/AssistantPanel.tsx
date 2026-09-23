@@ -9,6 +9,7 @@ function checkText(c:Check){return c.status==="conflict"?c.label+": конфли
 export default function AssistantPanel(){
   const chat=useChat(),{requestAddToCart,toggleCompare,compare,selectedCity}=useShop();
   const [input,setInput]=useState("");
+  const [visibleCounts,setVisibleCounts]=useState<Record<string,number>>({});
   const end=useRef<HTMLDivElement>(null);
   useEffect(()=>{end.current?.scrollIntoView({behavior:"smooth",block:"nearest"});},[chat.messages,chat.loading]);
   function submit(e:FormEvent){e.preventDefault();if(!input.trim()||chat.loading)return;void sendChat(input,selectedCity);setInput("");}
@@ -24,13 +25,15 @@ export default function AssistantPanel(){
       {chat.messages.map(m=><div key={m.id} className={"assistant-message-row"+(m.role==="user"?" assistant-message-row-user":"")}>
         <div className="assistant-message-content">
           <div className={"assistant-bubble"+(m.role==="user"?" assistant-bubble-user":"")}>{m.text}</div>
-          {!!m.products.length&&<div className="assistant-products">{m.products.map((p,i)=><article key={p.id} className="assistant-product-card">
+          {!!m.products.length&&<p className="assistant-result-count">Найдено: {m.products.length}. Показано: {Math.min(visibleCounts[m.id]||8,m.products.length)}. Цена и наличие — на время проверки; перед добавлением перепроверим.</p>}
+          {!!m.products.length&&<div className="assistant-products">{m.products.slice(0,visibleCounts[m.id]||8).map((p,i)=><article key={p.id} className="assistant-product-card">
             <div className="assistant-product-top"><div className="assistant-product-main">
               <span className="assistant-product-brand">Вариант {i+1} · {p.brand||"EKT"}</span>
               <Link className="assistant-product-name" to={"/product/"+p.id}>{p.name}</Link>
               <span className="assistant-product-article">Артикул: {p.article}</span>
             </div></div>
             {p.priceExplanation&&<p>{p.priceExplanation}</p>}
+            {!!p.evaluation?.checks.length&&<small>Почему предложен: ниже показаны совпадения с вашими параметрами и ограничения.</small>}
             <div className="assistant-product-checks">{p.evaluation?.checks.map(c=><div key={c.field} className={"assistant-product-check assistant-product-check-"+c.status}>{checkText(c)}</div>)}</div>
             {Object.entries(p.facts||{}).filter(([,f])=>f.conflict).map(([key,f])=><p key={key} className="compare-conflict"><TriangleAlert size={14}/>{key}: свойства {f.propertyValue}; описание {f.textValue}. Требует проверки.</p>)}
             <div className="assistant-product-footer"><div><strong>{p.price>0?p.price.toLocaleString("ru-RU")+" ₸":"Цена по запросу"}</strong>
@@ -42,9 +45,10 @@ export default function AssistantPanel(){
               <button className="assistant-add-cart" disabled={!(p.stockCity ? (p.cityQuantity??0)>0 : p.quantity>0)} onClick={()=>requestAddToCart({...p,quantity:p.stockCity?(p.cityQuantity??0):p.quantity},1)}><ShoppingCart size={16}/>В корзину</button>
             </div></div>
           </article>)}</div>}
+          {m.products.length>(visibleCounts[m.id]||8)&&<button className="assistant-show-more" onClick={()=>setVisibleCounts(current=>({...current,[m.id]:(current[m.id]||8)+8}))}>Показать ещё 8 из {m.products.length}</button>}
         </div>
       </div>)}
-      {chat.loading&&<div className="assistant-thinking" role="status"><Loader2 className="assistant-spinner" size={18}/>Проверяю запрос и данные EKT…</div>}
+      {chat.loading&&<div className="assistant-thinking" role="status"><Loader2 className="assistant-spinner" size={18}/>Проверяю все найденные кандидаты EKT. Большой запрос может занять несколько минут.</div>}
       {chat.error&&<div className="assistant-error" role="alert">{chat.error}</div>}
       <div ref={end}/>
     </div>
@@ -53,6 +57,7 @@ export default function AssistantPanel(){
       <button disabled={chat.loading} onClick={()=>void sendChat("А есть дешевле?",selectedCity)}>Есть дешевле?</button>
       <Link to="/compare">Таблица сравнения ({compare.length})</Link><Link to="/cart">Моя корзина</Link>
     </div>
+    <p className="assistant-privacy">Не указывайте платёжные или персональные данные. Запрос обрабатывается сервером и, если AI подключён, его провайдером. Чат сам не меняет корзину и не оформляет заказ.</p>
     <form className="assistant-input-area" onSubmit={submit}><input aria-label="Сообщение EKTiQ" maxLength={2000} value={input} onChange={e=>setInput(e.target.value)} placeholder="Артикул, задача или вопрос о выбранном товаре" disabled={chat.loading}/>
       <button type="submit" aria-label="Отправить" disabled={chat.loading||!input.trim()}><Send size={19}/></button>
     </form>

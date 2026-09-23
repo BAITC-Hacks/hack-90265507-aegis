@@ -155,8 +155,12 @@ export function ShopProvider({ children }: ShopProviderProps) {
   }
 
   function updateCartQuantity(productId: number, quantity: number) {
-    if (!Number.isFinite(quantity)) return;
-    quantity = Math.floor(quantity);
+    if (cartLock.current || !Number.isFinite(quantity)) return;
+    const selectedItem = cart.find(item => item.product.id === productId);
+    if (!selectedItem || !Number.isFinite(selectedItem.product.quantity) || selectedItem.product.quantity < 1) return;
+    quantity = Math.max(1, Math.min(Math.floor(quantity), Math.floor(selectedItem.product.quantity)));
+    if (quantity === selectedItem.quantity) return;
+    if (!window.confirm(`Изменить количество «${selectedItem.product.name}» с ${selectedItem.quantity} на ${quantity} шт.?`)) return;
     setCart((current) =>
       current.map((item) => {
         if (item.product.id !== productId) {
@@ -175,6 +179,9 @@ export function ShopProvider({ children }: ShopProviderProps) {
   }
 
   function removeFromCart(productId: number) {
+    if (cartLock.current) return;
+    const selectedItem = cart.find(item => item.product.id === productId);
+    if (!selectedItem || !window.confirm(`Удалить «${selectedItem.product.name}» из корзины?`)) return;
     setCart((current) =>
       current.filter((item) => item.product.id !== productId)
     );

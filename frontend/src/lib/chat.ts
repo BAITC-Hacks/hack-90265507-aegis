@@ -13,9 +13,13 @@ function update(p:Partial<State>){state={...state,...p};listeners.forEach(fn=>fn
 export function useChat(){return useSyncExternalStore(fn=>{listeners.add(fn);return()=>listeners.delete(fn);},()=>state);}
 export async function sendChat(text:string,city?:string){
   const message=text.trim();if(state.loading||!message)return;
+  if(/(?:\d[ -]?){13,19}|\b(?:cvv|cvc|pin)\b|(?:номер|данные|реквизиты)\s+карт|пин[ -]?код|(?:код\s+из\s+смс|sms\s*code)\s*[:=—-]?\s*\d{3,8}|\b[A-Z]{2}\d{2}(?:[ -]?[A-Z0-9]){11,30}\b|(?:card\s*(?:number)?|карт[аыуе])\s*[:=—-]?\s*(?:\d[ -]?){8,19}/i.test(message)){
+    update({error:"Не отправляйте номера карт, CVV/CVC, PIN или платёжные реквизиты. Укажите только товар и условия поиска."});return;
+  }
   if(message.length>2000){update({error:"Сообщение должно быть не длиннее 2000 символов."});return;}
   const controller=new AbortController();pending=controller;
-  const timeout=setTimeout(()=>controller.abort(),75000);
+  // Full-candidate verification can take minutes; do not cut it off at 75 seconds.
+  const timeout=setTimeout(()=>controller.abort(),30*60*1000);
   update({messages:[...state.messages,{id:crypto.randomUUID(),role:"user",text:message,products:[]}],loading:true,error:""});
   try{
     const data=await api<{message:string;conversationId:string;products:ChatProduct[];aiStatus:string}>("/api/assistant/chat",{
@@ -26,4 +30,11 @@ export async function sendChat(text:string,city?:string){
   }catch(e){if(pending===controller)update({error:controller.signal.aborted?"Запрос прерван. Попробуйте ещё раз.":e instanceof Error?e.message:"Ошибка подключения."});}
   finally{clearTimeout(timeout);if(pending===controller){pending=undefined;update({loading:false});}}
 }
-export function resetChat(){pending?.abort();pending=undefined;update({messages:[welcome],conversationId:undefined,loading:false,error:"",aiStatus:""});}
+export function resetChat(){
+  const previous=state.conversationId;
+  pending?.abort();pending=undefined;
+  update({messages:[welcome],conversationId:undefined,loading:false,error:"",aiStatus:""});
+  if(previous)void api("/api/assistant/conversations/"+encodeURIComponent(previous),{method:"DELETE"}).catch(()=>{
+    update({error:"Локальный диалог очищен. Удаление серверного диалога не подтверждено; он истечёт по сроку хранения."});
+  });
+}

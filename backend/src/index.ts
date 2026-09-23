@@ -1,6 +1,7 @@
 import { parseCatalogOptions, searchVerifiedCatalog } from "./services/verifiedCatalog.js";
 import { cityQuantity } from "./services/productFilters.js";
 import { aiConfigured } from "./services/aiService.js";
+import { containsPaymentCredentials } from "./services/privacy.js";
 import "dotenv/config";
 
 import express from "express";
@@ -165,6 +166,14 @@ app.post(
           });
       }
 
+      if ([message, conversationId, req.body?.city].some(value =>
+        typeof value === "string" && containsPaymentCredentials(value)
+      )) {
+        return res.status(400).json({
+          error: "Не отправляйте платёжные данные: номера карт, CVV/CVC, PIN, банковские реквизиты и коды подтверждения. Удалите их и повторите запрос.",
+        });
+      }
+
       const result =
         await processAssistantMessage(
           message,
@@ -174,11 +183,9 @@ app.post(
       return res.json(
         result
       );
-    } catch (error) {
-      console.error(
-        "Assistant error:",
-        error
-      );
+    } catch {
+      // Provider errors can contain request text; do not log them.
+      console.error("Assistant request failed");
 
       return res
         .status(500)
@@ -207,6 +214,12 @@ app.delete(
     });
   }
 );
+
+// Prevent malformed JSON and oversized payloads from exposing request text in
+// Express's default error response or console logger.
+app.use((_error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  res.status(400).json({ error: "Некорректный запрос" });
+});
 
 app.listen(
   PORT,

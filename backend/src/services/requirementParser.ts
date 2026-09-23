@@ -24,6 +24,7 @@ const BRANDS = [
 ];
 
 const PRODUCT_TYPES = [
+  { value: "Светильник", keywords: ["светильник", "светильники", "светильников", "светильника", "luminaire"] },
   {
     value: "Автоматический выключатель",
     keywords: [

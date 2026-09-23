@@ -22,7 +22,7 @@ export function fallbackPlan(message:string):Plan{
   if(requirements.inStock!==undefined&&!references.length)action="search";
   if(references.length&&action==="search")action="question";
   return {action,requirements,providedFields:[...fields.filter(f=>requirements[f]!==undefined),...(parsePrice(message).clear?["price"]:[])],reset:false,references:[...new Set(references)],
-    city:/алматы/i.test(q)?"Алматы":/астан|нур-султан/i.test(q)?"Астана":null,sort:/дешев|cheaper|cheap/.test(q)?"price-asc":"relevance",clarification:null};
+    city:/алматы/i.test(q)?"Алматы":/астан|нур-султан/i.test(q)?"Астана":null,sort:/дешев|cheaper|cheap|по\s+возрастанию\s+цен|lowest price/.test(parsePrice(q).textWithoutPrice)?"price-asc":"relevance",clarification:null};
 }
 export function mergePlan(previous:ProductRequirements,plan:Plan):ProductRequirements{
   const changedType=plan.requirements.productType&&previous.productType&&plan.requirements.productType!==previous.productType;
@@ -61,17 +61,17 @@ export async function processAssistantMessage(message:string,conversationId?:str
   if(!["greeting","conditions","cart"].includes(plan.action))conversation.requirements=requirements;
   addConversationTurn(conversation,"user",clean);
   let products:AssistantProduct[]=[],answer="",evidence:unknown={};
-  let checked=0,candidates=0,unknownPrice=0,unknownData=0;
+  let checked=0,candidates=0,unknownPrice=0,unknownData=0,failed=0;
   const finish=async()=>{
     if(source==="ai"&&!["cart","conditions"].includes(plan.action))try{
-      answer=await explainVerified(clean,history,{action:plan.action,requirements,products,details:evidence},answer);
+      answer=await explainVerified(clean,history,{action:plan.action,requirements,products:products.slice(0,8),totalProducts:products.length,details:evidence},answer);
     }catch{aiStatus="answer_fallback";}
     if(unknownPrice)answer+="\nЦена не подтверждена у "+unknownPrice+" проверенных товаров; они исключены.";
     if(unknownData)answer+="\nНе подтверждены запрошенные характеристики или остаток у "+unknownData+" товаров; они исключены.";
     if(candidates>checked)answer+="\nПроверено "+checked+" из "+candidates+" кандидатов. Это не весь каталог; уточните тип, бренд или артикул.";
     addConversationTurn(conversation,"assistant",answer);
-    if(products.length)updateConversationProducts(conversation,products.map(p=>p.id));
-    return {conversationId:conversation.id,message:answer,intent:plan.action,requirements,products,needsConfirmation:false,source,aiStatus,cartUrl:"/cart",compareUrl:"/compare"};
+    if(products.length)updateConversationProducts(conversation,products.slice(0,8).map(p=>p.id));
+    return {conversationId:conversation.id,message:answer,intent:plan.action,requirements,products,coverage:{candidates,checked,failed,partial:failed>0,matched:products.length,unknownPrice,unknownData},needsConfirmation:false,source,aiStatus,cartUrl:"/cart",compareUrl:"/compare"};
   };
   if(plan.action==="greeting"){answer="Здравствуйте! Я EKTiQ. Помогу найти товар EKT, проверить склады и объяснить различия. Напишите артикул или опишите задачу.";return finish();}
   if(plan.action==="clarify"){answer=plan.clarification||"Уточните, пожалуйста, товар или задачу.";return finish();}
@@ -127,15 +127,17 @@ export async function processAssistantMessage(message:string,conversationId?:str
     const query=[requirements.productType].filter(Boolean).join(" ");
     const matched=searchCatalog({query,brand:requirements.brand,all:true}).items;
     candidates=matched.length;
-    ids=matched.slice(0,120).map(p=>p.id);
+    ids=matched.map(p=>p.id);
   }
   if(excludedId)ids=ids.filter(id=>id!==excludedId);
   checked=ids.length;
-  const results=await verifyCandidates(ids);
+  candidates=ids.length;
+  const checks=new Map<number,ReturnType<typeof checkProduct>>();
+  const results=await verifyCandidates(ids,getProductById,p=>checks.set(p.id,checkProduct(p,requirements)));
   const applyFilters=["search","analogue"].includes(plan.action)||plan.providedFields.some(f=>["price","inStock","current","poles","voltage","brand","productType"].includes(f));
   products=results.flatMap(p=>{
     if(!p)return [];
-    const check=checkProduct(p,requirements);
+    const check=checks.get(p.id)!;
     if(applyFilters&&!check.matches){
       if(check.unknown.includes("цена не подтверждена"))unknownPrice++;
       if(check.unknown.some(s=>s!=="цена не подтверждена"))unknownData++;
@@ -146,7 +148,7 @@ export async function processAssistantMessage(message:string,conversationId?:str
       evaluation:evaluateProduct({id:p.id,name:p.name,article:p.article,brand:p.brand,description:p.description,properties:p.properties},requirements)}];
   });
   if(plan.action==="analogue")products=products.filter(p=>(cityQuantity(p,requirements.city)??0)>0);
-  const failed=results.filter(p=>!p).length;
+  failed=results.filter(p=>!p).length;
   if(!products.length){answer=failed?"Не удалось проверить товары через EKT. Попробуйте позже; наличие и цены сейчас подтвердить не могу.":"Среди проверенных товаров нет подходящих под все условия. Попробуйте изменить цену, город, бренд или характеристики.";return finish();}
   if(plan.action==="analogue")answer="Это кандидаты для технического сравнения, а не подтверждённые взаимозаменяемые аналоги. Проверьте назначение, характеристики и противоречия.";
   if(plan.action==="compare"){
@@ -161,11 +163,10 @@ export async function processAssistantMessage(message:string,conversationId?:str
     if(plan.action==="question")answer+="\n\n"+Object.entries(products[0].properties).slice(0,18).map(([k,v])=>k+": "+v).join("\n");
   }else{
     products.sort((a,b)=>plan.sort==="price-asc"?(a.price&&a.price>0?a.price:Infinity)-(b.price&&b.price>0?b.price:Infinity):b.evaluation.score-a.evaluation.score);
-    products=products.slice(0,8);
     if(!answer)answer="Проверены "+products.length+" товаров EKT. Карточки показывают совпадения, отличия и пробелы в данных. Совпадение отдельных параметров не гарантирует взаимозаменяемость.";
     if(products.some(p=>Object.values(p.facts).some(f=>f.conflict)))answer+=" Есть противоречивые характеристики — они отмечены для проверки.";
   }
-  if(requirements.price&&products.length)answer+="\n"+products.map(p=>p.article+": "+p.priceExplanation).join("\n");
+  if(requirements.price&&products.length)answer+="\n"+products.slice(0,8).map(p=>p.article+": "+p.priceExplanation).join("\n");
   if(failed)answer+="\nЧасть товаров не удалось проверить; показаны только полученные ответы EKT.";
   return finish();
 }

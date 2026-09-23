@@ -376,12 +376,12 @@ export default function CatalogPage() {
         <button type="submit">Применить фильтры</button><button type="button" onClick={resetFilters}>Сбросить фильтры</button>
       </form>
       {metadata.coverage&&<p role="status">
-        {metadata.notice} Проверено: {metadata.coverage.checked} из {metadata.coverage.candidates} кандидатов.
+        {metadata.notice} Проверено: {metadata.coverage.checked} из {metadata.coverage.candidates} кандидатов. Цены и остатки — на момент проверки каждого товара; перед добавлением в корзину они проверяются повторно.
         {metadata.coverage.unknownPrice>0&&" Цена не подтверждена: "+metadata.coverage.unknownPrice+"."}
         {metadata.coverage.unknownStock>0&&" Остаток не подтверждён: "+metadata.coverage.unknownStock+"."}
         {metadata.coverage.unknownTechnical>0&&" Характеристики не подтверждены: "+metadata.coverage.unknownTechnical+"."}
         {metadata.coverage.failed>0&&" Ошибки получения EKT: "+metadata.coverage.failed+"."}
-        {metadata.coverage.partial&&Number(searchParams.get("scan")||120)<600&&<button onClick={()=>setFilter("scan",String(Math.min(600,Number(searchParams.get("scan")||120)+120)))}>Проверить ещё 120 кандидатов</button>}
+        {metadata.coverage.checked<metadata.coverage.candidates&&searchParams.has("scan")&&<button onClick={()=>setFilter("scan","")}>Проверить весь список кандидатов</button>}
       </p>}
 
       {/* =========================
